@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- Meta viewport crucial para comportamiento nativo en celulares -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Poker Odds | Mobile App</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Estilo base para los "huecos" de las cartas */
+        .card-slot {
+            transition: all 0.2s ease;
+            background: #1e293b;
+            border: 2px dashed #475569;
+        }
+        
+        .card-slot.active-select {
+            border-color: #3b82f6; /* Blue 500 */
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            transform: scale(1.05);
+        }
+
+        /* Cartas llenas */
+        .card-filled {
+            background: #ffffff;
+            border: 2px solid #cbd5e1;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.5rem;
+        }
+
+        .suit-red { color: #ef4444; } /* Corazones y Diamantes */
+        .suit-black { color: #0f172a; } /* Picas y Tréboles */
+
+        /* Modal de selección que emerge desde abajo (Bottom Sheet) */
+        .modal-bottom {
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .modal-bottom.open {
+            transform: translateY(0);
+        }
+
+        /* Spinner de carga */
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <header class="p-4 bg-slate-800 border-b border-slate-700 shadow-md sticky top-0 z-10 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold text-blue-400">♠ Texas Hold'em</h1>
+            <p class="text-xs text-slate-400">Calculadora de Probabilidades</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <label class="text-xs text-slate-400 mb-1">Oponentes</label>
+            <select id="opponents" class="bg-slate-700 text-white rounded p-1 text-sm outline-none border border-slate-600 focus:border-blue-500">
+                <option value="1">1 Oponente</option>
+                <option value="2">2 Oponentes</option>
+                <option value="3">3 Oponentes</option>
+                <option value="4">4 Oponentes</option>
+                <option value="5">5 Oponentes</option>
+            </select>
+        </div>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto space-y-8 mt-2">
+        
+        <!-- Mis Cartas (Hole Cards) -->
+        <section>
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">Mis Cartas (2)</h2>
+                <button onclick="clearCards('player')" class="text-xs text-slate-400 hover:text-red-400">Borrar</button>
+            </div>
+            <div class="flex gap-4 justify-center">
+                <div id="p1" class="card-slot w-20 h-28 rounded-xl flex items-center justify-center cursor-pointer" onclick="openSelector('p1')">
+                    <span class="text-3xl text-slate-500">+</span>
+                </div>
+                <div id="p2" class="card-slot w-20 h-28 rounded-xl flex items-center justify-center cursor-pointer" onclick="openSelector('p2')">
+                    <span class="text-3xl text-slate-500">+</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mesa (Community Cards) -->
+        <section>
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300">La Mesa (Hasta 5)</h2>
+                <button onclick="clearCards('board')" class="text-xs text-slate-400 hover:text-red-400">Borrar</button>
+            </div>
+            <div class="flex justify-center gap-2 mb-2">
+                <!-- Flop -->
+                <div id="b1" class="card-slot w-16 h-24 rounded-lg flex items-center justify-center cursor-pointer" onclick="openSelector('b1')">
+                    <span class="text-2xl text-slate-500">+</span>
+                </div>
+                <div id="b2" class="card-slot w-16 h-24 rounded-lg flex items-center justify-center cursor-pointer" onclick="openSelector('b2')">
+                    <span class="text-2xl text-slate-500">+</span>
+                </div>
+                <div id="b3" class="card-slot w-16 h-24 rounded-lg flex items-center justify-center cursor-pointer" onclick="openSelector('b3')">
+                    <span class="text-2xl text-slate-500">+</span>
+                </div>
+            </div>
+            <div class="flex justify-center gap-2">
+                <!-- Turn y River -->
+                <div id="b4" class="card-slot w-16 h-24 rounded-lg flex items-center justify-center cursor-pointer" onclick="openSelector('b4')">
+                    <span class="text-2xl text-slate-500">+</span>
+                </div>
+                <div id="b5" class="card-slot w-16 h-24 rounded-lg flex items-center justify-center cursor-pointer" onclick="openSelector('b5')">
+                    <span class="text-2xl text-slate-500">+</span>
+                </div>
+            </div>
+            <p class="text-center text-xs text-slate-500 mt-3">Pre-flop (0), Flop (3), Turn (4) o River (5).</p>
+        </section>
+
+        <!-- Botón de Acción -->
+        <button id="calcBtn" onclick="calculateOdds()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex justify-center items-center gap-2 text-lg active:scale-95">
+            <span>Calcular Probabilidades</span>
+        </button>
+
+        <section id="resultsPanel" class="hidden bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-xl">
+            <h3 class="text-center text-sm text-slate-400 mb-4 uppercase tracking-widest">Resultado Simulación</h3>
+            
+            <div class="flex justify-between items-end mb-2">
+                <span class="text-slate-300">Probabilidad de Ganar</span>
+                <span id="resWin" class="text-3xl font-bold text-green-400">--%</span>
+            </div>
+            <!-- Barra de progreso visual -->
+            <div class="w-full bg-slate-700 rounded-full h-3 mb-6 overflow-hidden flex">
+                <div id="barWin" class="bg-green-500 h-full" style="width: 0%"></div>
+                <div id="barTie" class="bg-yellow-500 h-full" style="width: 0%"></div>
+                <div id="barLoss" class="bg-red-500 h-full" style="width: 0%"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-700/50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-slate-400 mb-1">Empate</p>
+                    <p id="resTie" class="text-xl font-semibold text-yellow-400">--%</p>
+                </div>
+                <div class="bg-slate-700/50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-slate-400 mb-1">Perder</p>
+                    <p id="resLoss" class="text-xl font-semibold text-red-400">--%</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modalOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden" onclick="closeSelector()"></div>
+    
+    <div id="cardSelector" class="modal-bottom fixed bottom-0 left-0 right-0 bg-slate-800 rounded-t-3xl z-50 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div class="w-12 h-1.5 bg-slate-600 rounded-full mx-auto mb-5"></div>
+        <h3 class="text-center font-semibold mb-4 text-slate-200">Selecciona el Valor</h3>
+        
+        <!-- Matriz de Valores -->
+        <div class="grid grid-cols-5 gap-2 mb-6" id="rankGrid">
+            <!-- JS generará esto -->
+        </div>
+
+        <h3 class="text-center font-semibold mb-4 text-slate-200 hidden" id="suitTitle">Selecciona el Palo</h3>
+        
+        <!-- Matriz de Palos -->
+        <div class="grid grid-cols-4 gap-3 hidden" id="suitGrid">
+            <button onclick="selectSuit('s')" class="bg-slate-700 py-4 rounded-xl text-3xl hover:bg-slate-600 active:bg-slate-500">♠</button>
+            <button onclick="selectSuit('h')" class="bg-slate-700 py-4 rounded-xl text-3xl text-red-500 hover:bg-slate-600 active:bg-slate-500">♥</button>
+            <button onclick="selectSuit('d')" class="bg-slate-700 py-4 rounded-xl text-3xl text-red-500 hover:bg-slate-600 active:bg-slate-500">♦</button>
+            <button onclick="selectSuit('c')" class="bg-slate-700 py-4 rounded-xl text-3xl hover:bg-slate-600 active:bg-slate-500">♣</button>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de la API (Apunta a tu localhost de Python por ahora)
+        const API_URL = "http://127.0.0.1:8000/api/poker/probabilidad";
+
+        // Variables de estado
+        const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+        const suitSymbols = { 's': '♠', 'h': '♥', 'd': '♦', 'c': '♣' };
+        
+        let currentTargetSlot = null;
+        let pendingRank = null;
+        let state = {
+            p1: null, p2: null,
+            b1: null, b2: null, b3: null, b4: null, b5: null
+        };
+
+        // Inicializar la interfaz del modal
+        function initModal() {
+            const grid = document.getElementById('rankGrid');
+            ranks.forEach(r => {
+                const btn = document.createElement('button');
+                btn.className = "bg-slate-700 py-3 rounded-lg text-lg font-bold text-white hover:bg-slate-600 active:bg-slate-500 transition-colors";
+                btn.innerText = r === 'T' ? '10' : r;
+                btn.onclick = () => selectRank(r);
+                grid.appendChild(btn);
+            });
+        }
+        initModal();
+
+        function openSelector(slotId) {
+            currentTargetSlot = slotId;
+            pendingRank = null;
+            
+            // Efecto visual en el slot
+            document.querySelectorAll('.card-slot').forEach(el => el.classList.remove('active-select'));
+            document.getElementById(slotId).classList.add('active-select');
+
+            // Resetear vistas del modal
+            document.getElementById('rankGrid').classList.remove('hidden');
+            document.getElementById('suitGrid').classList.add('hidden');
+            document.getElementById('suitTitle').classList.add('hidden');
+            
+            // Mostrar modal
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            setTimeout(() => document.getElementById('cardSelector').classList.add('open'), 10);
+        }
+
+        function closeSelector() {
+            document.getElementById('cardSelector').classList.remove('open');
+            setTimeout(() => {
+                document.getElementById('modalOverlay').classList.add('hidden');
+                if(currentTargetSlot) {
+                    document.getElementById(currentTargetSlot).classList.remove('active-select');
+                }
+            }, 300);
+        }
+
+        function selectRank(rank) {
+            pendingRank = rank;
+            document.getElementById('rankGrid').classList.add('hidden');
+            document.getElementById('suitGrid').classList.remove('hidden');
+            document.getElementById('suitTitle').classList.remove('hidden');
+        }
+
+        function selectSuit(suit) {
+            const cardString = pendingRank + suit;
+            
+            // Validar que la carta no esté ya seleccionada
+            if (Object.values(state).includes(cardString)) {
+                alert("Esta carta ya está en la mesa o en tu mano.");
+                return;
+            }
+
+            state[currentTargetSlot] = cardString;
+            renderCard(currentTargetSlot, pendingRank, suit);
+            closeSelector();
+        }
+
+        function renderCard(slotId, rank, suit) {
+            const el = document.getElementById(slotId);
+            const isRed = suit === 'h' || suit === 'd';
+            const displayRank = rank === 'T' ? '10' : rank;
+            
+            el.className = `card-filled ${slotId.startsWith('p') ? 'w-20 h-28 text-3xl' : 'w-16 h-24 text-2xl'}`;
+            el.innerHTML = `
+                <span class="${isRed ? 'suit-red' : 'suit-black'}">${displayRank}</span>
+                <span class="${isRed ? 'suit-red' : 'suit-black'} mt-1">${suitSymbols[suit]}</span>
+            `;
+            el.onclick = () => openSelector(slotId); // Mantener el evento de click
+        }
+
+        function clearCards(type) {
+            const slots = type === 'player' ? ['p1', 'p2'] : ['b1', 'b2', 'b3', 'b4', 'b5'];
+            slots.forEach(s => {
+                state[s] = null;
+                const el = document.getElementById(s);
+                el.className = `card-slot ${s.startsWith('p') ? 'w-20 h-28' : 'w-16 h-24'} rounded-xl flex items-center justify-center cursor-pointer`;
+                el.innerHTML = `<span class="${s.startsWith('p') ? 'text-3xl' : 'text-2xl'} text-slate-500">+</span>`;
+            });
+            document.getElementById('resultsPanel').classList.add('hidden');
+        }
+
+        async function calculateOdds() {
+            const pCards = [state.p1, state.p2].filter(Boolean);
+            const bCards = [state.b1, state.b2, state.b3, state.b4, state.b5].filter(Boolean);
+            const numOpponents = parseInt(document.getElementById('opponents').value);
+
+            // Validaciones locales rápidas
+            if (pCards.length !== 2) {
+                return alert("Selecciona tus 2 cartas iniciales.");
+            }
+            if (bCards.length === 1 || bCards.length === 2) {
+                return alert("La mesa debe tener 0 (Pre-flop), 3 (Flop), 4 (Turn) o 5 (River) cartas.");
+            }
+
+            // Estado de carga
+            const btn = document.getElementById('calcBtn');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<div class="loader"></div> <span>Calculando Miles de Escenarios...</span>`;
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        player_cards: pCards,
+                        board_cards: bCards,
+                        num_opponents: numOpponents
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Error en el servidor");
+                }
+
+                // Mostrar resultados
+                document.getElementById('resultsPanel').classList.remove('hidden');
+                
+                // Animar porcentajes
+                document.getElementById('resWin').innerText = `${data.win_pct}%`;
+                document.getElementById('resTie').innerText = `${data.tie_pct}%`;
+                document.getElementById('resLoss').innerText = `${data.loss_pct}%`;
+
+                // Animar barras
+                setTimeout(() => {
+                    document.getElementById('barWin').style.width = `${data.win_pct}%`;
+                    document.getElementById('barTie').style.width = `${data.tie_pct}%`;
+                    document.getElementById('barLoss').style.width = `${data.loss_pct}%`;
+                }, 100);
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                // Restaurar botón
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
